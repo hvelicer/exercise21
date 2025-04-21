@@ -1,0 +1,62 @@
+---
+title: "ESS 330 Exercise 21"
+author: "Hanna Velicer"
+format:
+  html:
+    self-contained: true
+editor: visual
+---
+
+```{r}
+# Packages
+install.packages("dataRetrieval")
+install.packages("tsibble")
+install.packages("plotly")
+install.packages("feasts")
+library(dataRetrieval)
+library(tidyverse)
+library(tidymodels)
+library(dplyr)
+library(tsibble)
+library(ggplot2)
+library(plotly)
+library(feasts)
+library(fabletools)
+
+# Downloading data
+poudre_flow <- readNWISdv(siteNumber = "06752260",    
+                          parameterCd = "00060",      
+                          startDate = "2013-01-01",   
+                          endDate = "2023-12-31") %>% 
+  renameNWISColumns() %>%                              
+  mutate(Date = yearmonth(Date)) %>%                   
+  group_by(Date) %>%                                   
+  summarise(Flow = mean(Flow))
+
+# Convert to tsibble
+poudre_tsb <- poudre_flow %>% 
+  as_tsibble(index = Date)
+
+# Plotting the time series
+timeser_plot <- ggplot(poudre_tsb, aes(x = Date, y = Flow)) +
+  geom_line(color = "purple") +
+  labs(title = "Streamflow",
+       y = "Flow", x = "Date") +
+  theme_minimal()
+
+ggplotly(timeser_plot)
+
+# Subseries
+poudre_tsb %>% 
+  gg_subseries(Flow)
+```
+Looking at the plot, I see a spike in streamflow in May and June. This is most likely the summer months for the plot. 
+```{r}
+# Decompose
+dec <- poudre_tsb %>% 
+  model(STL(Flow ~ season(window = "periodic"))) %>% 
+  components()
+
+autoplot(dec)
+```
+Looking at the plot, many of the components stay in similar patterns over time. Flow slightly dips a little and the remainder transitioned from positive spikes to more negative spikes.
